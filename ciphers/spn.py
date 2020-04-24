@@ -111,24 +111,20 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-k', '--key', default=None)
+    parser.add_argument('key')
+    parser.add_argument('input_file')
     parser.add_argument('--dec', action='store_true')
     parser.add_argument('-o', '--out', default=None)
-    parser.add_argument('data')
 
     args = parser.parse_args()
-    if args.key is None:
-        key = os.urandom(10)
-        print('use random key: ' + key.hex())
-    else:
-        key = bytes.fromhex(args.key)
+    key = bytes.fromhex(args.key)
     is_dec = args.dec
-    data = bytes.fromhex(args.data)
+    data = open(args.input_file, 'rb').read()
     if args.out is None:
         write_output = False
     else:
         write_output = True
-        filename = args.out
+        output_file = args.out
 
     spn = SPN(key)
     if is_dec:
@@ -138,4 +134,4 @@ if __name__ == '__main__':
     if not write_output:
         print('output: {}'.format(output.hex()))
     else:
-        open(filename, 'wb').write(output)
+        open(output_file, 'wb').write(output)
