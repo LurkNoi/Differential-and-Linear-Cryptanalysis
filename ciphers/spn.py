@@ -45,7 +45,7 @@ class SPN:
     """Basic Substitution-Permutation Network (SPN) Cipher"""
 
     def __init__(self, masterkey: bytes):
-        if len(key) != 10:
+        if len(masterkey) != 10:
             raise TypeError('key length must be 10')
         self.subkey_ = [byte_to_int(masterkey[i:i+2])
                         for i in range(0, 10, 2)]
