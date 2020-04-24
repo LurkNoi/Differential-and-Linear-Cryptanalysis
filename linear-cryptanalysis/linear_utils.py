@@ -40,5 +40,12 @@ def print_table(table):
     for input_mask in range(nrows):
         print("{:3x} |".format(input_mask), end=' ')
         for output_mask in range(ncols):
-            print("{:+3d}".format(table[input_mask][output_mask]), end=' ')
+            print("{:3d}".format(table[input_mask][output_mask]), end=' ')
         print()
+
+
+if __name__ == '__main__':
+    from spn import SBOX
+
+    absolute_bias_table = linear_approximation_table(SBOX)
+    print_table(absolute_bias_table)
