@@ -4,6 +4,15 @@ utils for differential cryptanalysis of the basic SPN cipher
 """
 
 
+def byte_xor(a: bytes, b: bytes) -> bytes:
+    """
+    return a XOR b
+    """
+    if len(a) != len(b):
+        raise TypeError("Both a and b must have the same length.")
+    return bytes([x^y for x, y in zip(a, b)])
+
+
 def difference_distribution_table(sbox):
     """
     Return the difference distribution table for a given sbox
