@@ -50,7 +50,7 @@ for data_pair_i in data_pairs:
         u4_13_to_16 = [SBOX_INV[v4_13_to_16[0]],
                        SBOX_INV[v4_13_to_16[1]]]
 
-        # count how many times the expected difference occers
+        # count how many times the expected difference occurs
         delta_u4_5_to_8 = u4_5_to_8[0] ^ u4_5_to_8[1]
         delta_u4_13_to_16 = u4_13_to_16[0] ^ u4_13_to_16[1]
         if 0x6 == delta_u4_5_to_8 == delta_u4_13_to_16:
