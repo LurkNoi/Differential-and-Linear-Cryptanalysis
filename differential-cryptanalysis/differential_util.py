@@ -22,21 +22,25 @@ def difference_distribution_table(sbox):
 
     return DDTable
 
-def print_table(table):
+def print_table(table, nonzero=True):
     """
     Print the difference distribution table
     """
     nrows = len(table)
     ncols = len(table[0])
     print("    |", end=' ')
-    for output_mask in range(ncols):
-        print("{:3x}".format(output_mask), end=' ')
+    for output_diff in range(ncols):
+        print("{:3x}".format(output_diff), end=' ')
     print()
     print(' ' + '-' * (4*ncols + 4))
-    for input_mask in range(nrows):
-        print("{:3x} |".format(input_mask), end=' ')
-        for output_mask in range(ncols):
-            print("{:3d}".format(table[input_mask][output_mask]), end=' ')
+    for input_diff in range(nrows):
+        print("{:3x} |".format(input_diff), end=' ')
+        for output_diff in range(ncols):
+            v = table[input_diff][output_diff]
+            if nonzero and v == 0:
+                print(' '*3, end=' ')
+            else:
+                print("{:3d}".format(v), end=' ')
         print()
 
 

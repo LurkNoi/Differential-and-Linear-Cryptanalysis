@@ -26,7 +26,7 @@ def linear_approximation_table(sbox):
 
     return absolute_bias_table
 
-def print_table(table):
+def print_table(table, nonzero=False):
     """
     Print the linear approximation table
     """
@@ -40,7 +40,11 @@ def print_table(table):
     for input_mask in range(nrows):
         print("{:3x} |".format(input_mask), end=' ')
         for output_mask in range(ncols):
-            print("{:3d}".format(table[input_mask][output_mask]), end=' ')
+            v = table[input_mask][output_mask]
+            if nonzero and v == 0:
+                print(' '*3, end=' ')
+            else:
+                print("{:3d}".format(v), end=' ')
         print()
 
 
