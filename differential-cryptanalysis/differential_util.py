@@ -31,7 +31,7 @@ def difference_distribution_table(sbox):
 
     return DDTable
 
-def print_table(table, nonzero=True):
+def print_table(table):
     """
     Print the difference distribution table
     """
@@ -45,11 +45,7 @@ def print_table(table, nonzero=True):
     for input_diff in range(nrows):
         print("{:3x} |".format(input_diff), end=' ')
         for output_diff in range(ncols):
-            v = table[input_diff][output_diff]
-            if nonzero and v == 0:
-                print(' '*3, end=' ')
-            else:
-                print("{:3d}".format(v), end=' ')
+            print("{:3d}".format(table[input_diff][output_diff]), end=' ')
         print()
 
 
