@@ -51,5 +51,5 @@ def print_table(table, nonzero=False):
 if __name__ == '__main__':
     from spn import SBOX
 
-    absolute_bias_table = linear_approximation_table(SBOX)
-    print_table(absolute_bias_table)
+    LAT = linear_approximation_table(SBOX)
+    print_table(LAT)

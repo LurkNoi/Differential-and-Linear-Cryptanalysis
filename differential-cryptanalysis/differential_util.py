@@ -12,7 +12,6 @@ def byte_xor(a: bytes, b: bytes) -> bytes:
         raise TypeError("Both a and b must have the same length.")
     return bytes([x^y for x, y in zip(a, b)])
 
-
 def difference_distribution_table(sbox):
     """
     Return the difference distribution table for a given sbox
@@ -22,14 +21,14 @@ def difference_distribution_table(sbox):
     if nrows & (nrows - 1) != 0:
         raise TypeError("sbox length is not a power of 2")
 
-    DDTable = [[0 for j in range(ncols)] for i in range(nrows)]
+    diff_dist_table = [[0 for j in range(ncols)] for i in range(nrows)]
     for i in range(nrows):
-        S_i = sbox[i]
+        s_i = sbox[i]
         for input_diff in range(nrows):
-            output_diff = S_i ^ sbox[i^input_diff]
-            DDTable[input_diff][output_diff] += 1
+            output_diff = s_i ^ sbox[i^input_diff]
+            diff_dist_table[input_diff][output_diff] += 1
 
-    return DDTable
+    return diff_dist_table
 
 def print_table(table):
     """
@@ -52,5 +51,5 @@ def print_table(table):
 if __name__ == '__main__':
     from spn import SBOX
 
-    DDTable = difference_distribution_table(SBOX)
-    print_table(DDTable)
+    DDT = difference_distribution_table(SBOX)
+    print_table(DDT)

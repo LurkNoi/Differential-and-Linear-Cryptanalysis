@@ -12,19 +12,19 @@ from spn import SBOX_INV, byte_to_int, SPN
 
 
 KEY = os.urandom(10)
-spn = SPN(KEY)
+SPN_CIPHER = SPN(KEY)
 print(f'key: {KEY.hex()}')
 
-# generate data pairs
-BS = 2 # block_size
-npairs = 10000
-plain = os.urandom(BS * npairs)
-cipher = spn.encrypt(plain)
+# a known plaintext attack
+BS = 2 # block size (in bytes)
+NPAIRS = 10000 # number of plaintext-ciphertext pairs
+plain = os.urandom(BS * NPAIRS)
+cipher = SPN_CIPHER.encrypt(plain)
 data_pairs = [(plain[i*BS : (i+1)*BS], cipher[i*BS : (i+1)*BS])
-              for i in range(npairs)]
+              for i in range(NPAIRS)]
 
 partial_subkey_nbits = 8
-count_table = [-npairs//2 for _ in range(1<<partial_subkey_nbits)]
+count_table = [-NPAIRS//2 for _ in range(1<<partial_subkey_nbits)]
 for pt, ct in data_pairs:
     pt_i, ct_i = byte_to_int(pt), byte_to_int(ct)
     # p_partial_sum = p_5 ^ p_7 ^ p_8
@@ -43,22 +43,23 @@ for pt, ct in data_pairs:
         u4_5_to_8 = SBOX_INV[v4_5_to_8]
         u4_13_to_16 = SBOX_INV[v4_13_to_16]
 
+        # count how many times the eqution holds
         u4_6 = (u4_5_to_8 >> 2)&0b1
         u4_8 = u4_5_to_8 & 0b1
         u4_14 = (u4_13_to_16 >> 2)&0b1
         u4_16 = u4_13_to_16 & 0b1
-        if 0 == u4_6 ^ u4_8 ^ u4_14 ^ u4_16 ^ p_partial_sum:
+        if u4_6 ^ u4_8 ^ u4_14 ^ u4_16 ^ p_partial_sum == 0:
             count_table[partial_subkey] += 1
 
-bias_table = [{'partial_subkey': partial_subkey, 
+bias_table = [{'partial_subkey': partial_subkey,
                'bias': abs(count_table[partial_subkey])}
               for partial_subkey in range(1<<partial_subkey_nbits)]
 
 
-K_i = byte_to_int(KEY)
-target_partial_subkey = ((K_i >> 4)&0b11110000) + (K_i & 0b1111)
+KEY_i = byte_to_int(KEY)
+target_partial_subkey = ((KEY_i >> 4)&0b11110000) + (KEY_i & 0b1111)
 print(f'Target partial subkey: {target_partial_subkey:02x} ' \
       f'with bias: {1/32.0:.4f}')
 for prob in sorted(bias_table, key=lambda x: x['bias'], reverse=True)[:10]:
     print(f"  guess {prob['partial_subkey']:02x} " \
-          f"with bias {prob['bias']/float(npairs):.4f}")
+          f"with bias {prob['bias']/float(NPAIRS):.4f}")
