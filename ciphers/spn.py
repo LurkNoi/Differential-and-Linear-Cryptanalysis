@@ -21,13 +21,11 @@ MODE_DEC = 1
 class SPN:
     """Substitution-Permutation Network (SPN) Cipher"""
 
-    def __init__(self, subkey: list, sbox: list, pbox: list,
+    def __init__(self, sbox: list, pbox: list,
                  nrounds: int, block_size: int):
         sbox_length = len(sbox)
         pbox_length = len(pbox)
         sbox_size = (sbox_length - 1).bit_length()
-        if len(subkey) < nrounds + 1:
-            raise TypeError("subkeys are not enough")
         if sbox_length & (sbox_length - 1) != 0:
             raise TypeError("sbox length is not a power of 2")
         if (8 * block_size) % sbox_size != 0:
@@ -41,7 +39,6 @@ class SPN:
 
         self.Nr = nrounds
         self.block_size = block_size
-        self.subkey_ = subkey
         self.sbox_dct = {
             'sbox': sbox,
             'sbox_inv': [sbox.index(i) for i in range(sbox_length)],
@@ -54,16 +51,16 @@ class SPN:
         self.block_mask = (1 << (8 * block_size)) - 1
 
     def substitution(self, block_i, mode):
-        sbox = self.sbox_dct
+        sbox_dct = self.sbox_dct
         if mode == MODE_ENC:
-            S = sbox['sbox']
+            sbox = sbox_dct['sbox']
         elif mode == MODE_DEC:
-            S = sbox['sbox_inv']
-        sbox_size = sbox['sbox_size']
-        nsboxes = sbox['nsboxes']
-        mask = sbox['mask']
+            sbox = sbox_dct['sbox_inv']
+        sbox_size = sbox_dct['sbox_size']
+        nsboxes = sbox_dct['nsboxes']
+        mask = sbox_dct['mask']
         box_ = [(block_i >> (sbox_size*i))&mask for i in range(nsboxes)]
-        block_i = sum([(S[box_[i]] << (sbox_size*i))
+        block_i = sum([(sbox[box_[i]] << (sbox_size*i))
                        for i in range(nsboxes)])
         return block_i
 
@@ -79,33 +76,9 @@ class SPN:
                        for i in range(block_nbits)])
         return block_i
 
-    def key_mixing(self, block_i, round_r):
-        block_i ^= self.subkey_[round_r]
+    def key_mixing(self, block_i, subkey_i):
+        block_i ^= subkey_i
         return block_i & self.block_mask
-
-    def encrypt_block(self, block):
-        block_i = byte_to_int(block) & self.block_mask
-        Nr = self.Nr
-        for r in range(Nr - 1):
-            block_i = self.key_mixing(block_i, r)
-            block_i = self.substitution(block_i, MODE_ENC)
-            block_i = self.permutation(block_i, MODE_ENC)
-        block_i = self.key_mixing(block_i, Nr-1)
-        block_i = self.substitution(block_i, MODE_ENC)
-        block_i = self.key_mixing(block_i, Nr)
-        return int_to_byte(block_i, self.block_size)
-
-    def decrypt_block(self, block):
-        block_i = byte_to_int(block) & self.block_mask
-        Nr = self.Nr
-        block_i = self.key_mixing(block_i, Nr)
-        block_i = self.substitution(block_i, MODE_DEC)
-        block_i = self.key_mixing(block_i, Nr-1)
-        for r in range(Nr-2, -1, -1):
-            block_i = self.permutation(block_i, MODE_DEC)
-            block_i = self.substitution(block_i, MODE_DEC)
-            block_i = self.key_mixing(block_i, r)
-        return int_to_byte(block_i, self.block_size)
 
     def encrypt(self, data):
         block_size = self.block_size
@@ -153,14 +126,39 @@ class basicSPN(SPN):
                 block_size * (nrounds + 1)
             ))
         self.KEY = key
-        subkey = [byte_to_int(key[i:i+block_size])
+        self.subkey_ = [byte_to_int(key[i:i+block_size])
                   for i in range(0, len(key), block_size)]
-        SPN.__init__(self, subkey=subkey, sbox=self.SBOX, pbox=self.PBOX,
+        SPN.__init__(self, sbox=self.SBOX, pbox=self.PBOX,
                      nrounds=nrounds, block_size=block_size)
 
     def __repr__(self):
         return "basicSPN ({} rounds) with key = {}".format(self.Nr, self.KEY.hex())
 
+    def encrypt_block(self, block):
+        block_i = byte_to_int(block) & self.block_mask
+        Nr = self.Nr
+        subkey_ = self.subkey_
+        for r in range(Nr - 1):
+            block_i = self.key_mixing(block_i, subkey_[r])
+            block_i = self.substitution(block_i, MODE_ENC)
+            block_i = self.permutation(block_i, MODE_ENC)
+        block_i = self.key_mixing(block_i, subkey_[Nr-1])
+        block_i = self.substitution(block_i, MODE_ENC)
+        block_i = self.key_mixing(block_i, subkey_[Nr])
+        return int_to_byte(block_i, self.block_size)
+
+    def decrypt_block(self, block):
+        block_i = byte_to_int(block) & self.block_mask
+        Nr = self.Nr
+        subkey_ = self.subkey_
+        block_i = self.key_mixing(block_i, subkey_[Nr])
+        block_i = self.substitution(block_i, MODE_DEC)
+        block_i = self.key_mixing(block_i, subkey_[Nr-1])
+        for r in range(Nr-2, -1, -1):
+            block_i = self.permutation(block_i, MODE_DEC)
+            block_i = self.substitution(block_i, MODE_DEC)
+            block_i = self.key_mixing(block_i, subkey_[r])
+        return int_to_byte(block_i, self.block_size)
 
 
 if __name__ == '__main__':
