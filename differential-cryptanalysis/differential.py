@@ -15,7 +15,7 @@ from differential_util import byte_xor
 KEY = os.urandom(10)
 SPN_CIPHER = basicSPN(KEY)
 SBOX_INV = SPN_CIPHER.sbox_dct['sbox_inv']
-print(f'key: {KEY.hex()}')
+print(SPN_CIPHER)
 
 # a choosen plaintext attack
 BS = 2 # block_size

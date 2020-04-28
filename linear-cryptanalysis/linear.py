@@ -14,7 +14,7 @@ from spn import byte_to_int, basicSPN
 KEY = os.urandom(10)
 SPN_CIPHER = basicSPN(KEY)
 SBOX_INV = SPN_CIPHER.sbox_dct['sbox_inv']
-print(f'key: {KEY.hex()}')
+print(SPN_CIPHER)
 
 # a known plaintext attack
 BS = 2 # block size (in bytes)
