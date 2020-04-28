@@ -8,11 +8,12 @@ use example mentioned in section 3.4
 """
 import os
 
-from spn import SBOX_INV, byte_to_int, SPN
+from spn import byte_to_int, basicSPN
 
 
 KEY = os.urandom(10)
-SPN_CIPHER = SPN(KEY)
+SPN_CIPHER = basicSPN(KEY)
+SBOX_INV = SPN_CIPHER.sbox_dct['sbox_inv']
 print(f'key: {KEY.hex()}')
 
 # a known plaintext attack
