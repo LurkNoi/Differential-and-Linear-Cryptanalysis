@@ -12,7 +12,7 @@ def byte_xor(a: bytes, b: bytes) -> bytes:
         raise TypeError("Both a and b must have the same length.")
     return bytes([x^y for x, y in zip(a, b)])
 
-def difference_distribution_table(sbox):
+def difference_distribution_table(sbox, truncated=False):
     """
     Return the difference distribution table for a given sbox
     """
@@ -28,9 +28,16 @@ def difference_distribution_table(sbox):
             output_diff = s_i ^ sbox[i^input_diff]
             diff_dist_table[input_diff][output_diff] += 1
 
+    if truncated:
+        truncated_DDT = [
+            [1 if diff_dist_table[i][j] else 0 for j in range(ncols)]
+            for i in range(nrows)
+        ]
+        return truncated_DDT
+
     return diff_dist_table
 
-def print_table(table):
+def print_table(table, nonzero=False):
     """
     Print the difference distribution table
     """
@@ -44,7 +51,11 @@ def print_table(table):
     for input_diff in range(nrows):
         print("{:3x} |".format(input_diff), end=' ')
         for output_diff in range(ncols):
-            print("{:3d}".format(table[input_diff][output_diff]), end=' ')
+            v = table[input_diff][output_diff]
+            if nonzero and (v == 0):
+                print(' '*3, end=' ')
+            else:
+                print("{:3d}".format(v), end=' ')
         print()
 
 
@@ -58,3 +69,5 @@ if __name__ == '__main__':
 
     DDT = difference_distribution_table(SBOX)
     print_table(DDT)
+    DDT = difference_distribution_table(SBOX, truncated=True)
+    print_table(DDT, nonzero=True)
