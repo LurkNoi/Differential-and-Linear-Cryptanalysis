@@ -31,11 +31,11 @@ class SPN:
         if (8 * block_size) % sbox_size != 0:
             raise TypeError("sbox size must divide block size")
         if set(sbox) != set(range(sbox_length)):
-            raise TypeError("sbox is not invertable")
+            raise TypeError("sbox is not invertible")
         if pbox_length != block_size * 8:
             raise TypeError("pbox length disagrees with block size")
         if set(pbox) != set(range(pbox_length)):
-            raise TypeError("pbox is not invertable")
+            raise TypeError("pbox is not invertible")
 
         self.Nr = nrounds
         self.block_size = block_size
