@@ -48,8 +48,8 @@ class SPN:
     """Basic Substitution-Permutation Network (SPN) Cipher"""
 
     def __init__(self, masterkey: bytes,
-                 sbox: list,
-                 pbox: list,
+                 sbox: list = SBOX,
+                 pbox: list = PBOX,
                  nrounds: int = 4,
                  block_size: int = 2):
         if len(masterkey) != block_size * (nrounds + 1):
@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     nrounds = 5
     key = os.urandom(2*nrounds + 2)
-    SPN_CIPHER = SPN(key, SBOX, PBOX, nrounds=nrounds)
+    SPN_CIPHER = SPN(key, nrounds=nrounds)
     plaintext = os.urandom(10)
     ciphertext = SPN_CIPHER.encrypt(plaintext)
     if SPN_CIPHER.decrypt(ciphertext) != plaintext:
