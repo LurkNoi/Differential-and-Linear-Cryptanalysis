@@ -48,7 +48,7 @@ class SPN:
         self.block_size = block_size
         self.subkey_ = [byte_to_int(masterkey[i:i+block_size])
                         for i in range(0, len(masterkey), block_size)]
-        self.sbox = {
+        self.sbox_dct = {
             'sbox': sbox,
             'sbox_inv': [sbox.index(i) for i in range(sbox_length)],
             'sbox_size': sbox_size,
@@ -60,7 +60,7 @@ class SPN:
         self.block_mask = (1 << (8 * block_size)) - 1
 
     def substitution(self, block_i, mode):
-        sbox = self.sbox
+        sbox = self.sbox_dct
         if mode == MODE_ENC:
             S = sbox['sbox']
         elif mode == MODE_DEC:
