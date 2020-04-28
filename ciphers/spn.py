@@ -1,34 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-A python implement of basic SPN cipher as proposed in
-
-- Heys, Howard M. "A tutorial on linear and differential cryptanalysis."
-  Cryptologia 26.3 (2002): 189-221.
+python implement of SPN ciphers
 """
 
-SBOX = [
-    0x0E, 0x04, 0x0D, 0x01,
-    0x02, 0x0F, 0x0B, 0x08,
-    0x03, 0x0A, 0x06, 0x0C,
-    0x05, 0x09, 0x00, 0x07,
-]
-
-SBOX_INV = [
-    0x0E, 0x03, 0x04, 0x08,
-    0x01, 0x0C, 0x0A, 0x0F,
-    0x07, 0x0D, 0x09, 0x06,
-    0x0B, 0x02, 0x00, 0x05,
-]
-
-PBOX = [
-    0x00, 0x04, 0x08, 0x0C,
-    0x01, 0x05, 0x09, 0x0D,
-    0x02, 0x06, 0x0A, 0x0E,
-    0x03, 0x07, 0x0B, 0x0F,
-]
-
-# since P-box is symmetric
-PBOX_INV = PBOX
 
 def byte_to_int(b):
     return int.from_bytes(b, 'big')
@@ -45,13 +19,13 @@ MODE_ENC = 0
 MODE_DEC = 1
 
 class SPN:
-    """Basic Substitution-Permutation Network (SPN) Cipher"""
+    """Substitution-Permutation Network (SPN) Cipher"""
 
     def __init__(self, masterkey: bytes,
-                 sbox: list = SBOX,
-                 pbox: list = PBOX,
-                 nrounds: int = 4,
-                 block_size: int = 2):
+                 sbox: list,
+                 pbox: list,
+                 nrounds: int,
+                 block_size: int):
         if len(masterkey) != block_size * (nrounds + 1):
             raise TypeError('key length must be {}'.format(
                 block_size * (nrounds + 1)
@@ -158,12 +132,43 @@ class SPN:
         return data
 
 
+class basicSPN(SPN):
+    """
+    Basic Substitution-Permutation Network (SPN) Cipher as proposed in
+
+    - Heys, Howard M. "A tutorial on linear and differential cryptanalysis."
+      Cryptologia 26.3 (2002): 189-221.
+    """
+    SBOX = [
+        0x0E, 0x04, 0x0D, 0x01,
+        0x02, 0x0F, 0x0B, 0x08,
+        0x03, 0x0A, 0x06, 0x0C,
+        0x05, 0x09, 0x00, 0x07,
+    ]
+    PBOX = [
+        0x00, 0x04, 0x08, 0x0C,
+        0x01, 0x05, 0x09, 0x0D,
+        0x02, 0x06, 0x0A, 0x0E,
+        0x03, 0x07, 0x0B, 0x0F,
+    ]
+
+    def __init__(self, key, nrounds):
+        self.N = nrounds
+        self.KEY = key
+        SPN.__init__(self, masterkey=key, sbox=self.SBOX, pbox=self.PBOX,
+                     nrounds=nrounds, block_size=2)
+
+    def __repr__(self):
+        return "basicSPN ({} rounds) with key = {}".format(self.N, self.KEY.hex())
+
+
+
 if __name__ == '__main__':
     import os
 
     nrounds = 5
     key = os.urandom(2*nrounds + 2)
-    SPN_CIPHER = SPN(key, nrounds=nrounds)
+    SPN_CIPHER = basicSPN(key, nrounds=nrounds)
     plaintext = os.urandom(10)
     ciphertext = SPN_CIPHER.encrypt(plaintext)
     if SPN_CIPHER.decrypt(ciphertext) != plaintext:
