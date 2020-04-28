@@ -21,18 +21,13 @@ MODE_DEC = 1
 class SPN:
     """Substitution-Permutation Network (SPN) Cipher"""
 
-    def __init__(self, masterkey: bytes,
-                 sbox: list,
-                 pbox: list,
-                 nrounds: int,
-                 block_size: int):
-        if len(masterkey) != block_size * (nrounds + 1):
-            raise TypeError('key length must be {}'.format(
-                block_size * (nrounds + 1)
-            ))
+    def __init__(self, subkey: list, sbox: list, pbox: list,
+                 nrounds: int, block_size: int):
         sbox_length = len(sbox)
         pbox_length = len(pbox)
         sbox_size = (sbox_length - 1).bit_length()
+        if len(subkey) < nrounds + 1:
+            raise TypeError("subkeys are not enough")
         if sbox_length & (sbox_length - 1) != 0:
             raise TypeError("sbox length is not a power of 2")
         if (8 * block_size) % sbox_size != 0:
@@ -46,8 +41,7 @@ class SPN:
 
         self.Nr = nrounds
         self.block_size = block_size
-        self.subkey_ = [byte_to_int(masterkey[i:i+block_size])
-                        for i in range(0, len(masterkey), block_size)]
+        self.subkey_ = subkey
         self.sbox_dct = {
             'sbox': sbox,
             'sbox_inv': [sbox.index(i) for i in range(sbox_length)],
@@ -153,13 +147,19 @@ class basicSPN(SPN):
     ]
 
     def __init__(self, key, nrounds=4):
-        self.N = nrounds
+        block_size = 2
+        if len(key) != block_size * (nrounds + 1):
+            raise TypeError('key length must be {}'.format(
+                block_size * (nrounds + 1)
+            ))
         self.KEY = key
-        SPN.__init__(self, masterkey=key, sbox=self.SBOX, pbox=self.PBOX,
-                     nrounds=nrounds, block_size=2)
+        subkey = [byte_to_int(key[i:i+block_size])
+                  for i in range(0, len(key), block_size)]
+        SPN.__init__(self, subkey=subkey, sbox=self.SBOX, pbox=self.PBOX,
+                     nrounds=nrounds, block_size=block_size)
 
     def __repr__(self):
-        return "basicSPN ({} rounds) with key = {}".format(self.N, self.KEY.hex())
+        return "basicSPN ({} rounds) with key = {}".format(self.Nr, self.KEY.hex())
 
 
 
