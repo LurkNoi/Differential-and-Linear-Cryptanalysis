@@ -9,6 +9,7 @@ REFERENCES:
    https://doi.org/10.1007/978-3-319-12087-4_3
 """
 import os
+from fractions import Fraction
 
 import mip
 from differential_util import difference_distribution_table
@@ -167,13 +168,13 @@ for r in range(NR):
     print('X'*36)
 
 # caculate the prob.
-numerator = denominator = 1.0
+prob = Fraction(1, 1)
 for t in range(number_of_sbox - 4):
     if sol_A_[t] == 1:
         in_diff = int(8*sol_x_[4*t] + 4*sol_x_[4*t+1]
                       + 2*sol_x_[4*t+2] + sol_x_[4*t+3])
         out_diff = int(8*sol_y_[4*t] + 4*sol_y_[4*t+1]
                        + 2*sol_y_[4*t+2] + sol_y_[4*t+3])
-        numerator *= DDT[in_diff][out_diff]
-        denominator *= 16
-print('diff. prob. = {:.5f}'.format(numerator/denominator))
+        prob *= DDT[in_diff][out_diff]
+        prob /= 16
+print('diff. prob. = {}'.format(prob))
