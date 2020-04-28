@@ -103,18 +103,17 @@ m += sum_At >= 1
 # add constraints
 for r in range(NR - 1):
     block_in = x_[16*r : 16*(r+1)]
+    if r == NR - 1:
+        for i in range(4):
+            t = 4*r + i
+            add_sbox(model=m, xs=block_in[4*i : 4*(i+1)], A_t=A_[t])
+        break
     next_block_in = x_[16*(r+1) : 16*(r+2)]
     block_out = [next_block_in[PBOX_INV[i]] for i in range(16)]
     for i in range(4):
         t = 4*r + i
         add_sbox(model=m, xs=block_in[4*i : 4*(i+1)], A_t=A_[t],
                  ys=block_out[4*i : 4*(i+1)], B_S=B_S)
-
-r = NR - 1
-block_in = x_[16*r : 16*(r+1)]
-for i in range(4):
-    t = 4*r + i
-    add_sbox(model=m, xs=block_in[4*i : 4*(i+1)], A_t=A_[t])
 
 # m.write('spn.lp')
 
