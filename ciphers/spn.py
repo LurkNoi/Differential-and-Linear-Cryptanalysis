@@ -152,7 +152,7 @@ class basicSPN(SPN):
         0x03, 0x07, 0x0B, 0x0F,
     ]
 
-    def __init__(self, key, nrounds):
+    def __init__(self, key, nrounds=4):
         self.N = nrounds
         self.KEY = key
         SPN.__init__(self, masterkey=key, sbox=self.SBOX, pbox=self.PBOX,
