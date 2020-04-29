@@ -117,11 +117,14 @@ def get_prob(sol_x_, sol_A_, DDT):
     """
     prob = Fraction(1, 1)
     for t in range(len(sol_A_) - 4):
+        if prob == 0:
+            return 0
         if sol_A_[t] == 1:
             in_diff = int(8*sol_x_[4*t] + 4*sol_x_[4*t+1]
                           + 2*sol_x_[4*t+2] + sol_x_[4*t+3])
             out_diff = int(8*sol_y_[4*t] + 4*sol_y_[4*t+1]
                            + 2*sol_y_[4*t+2] + sol_y_[4*t+3])
+            # print(in_diff, out_diff, DDT[in_diff][out_diff])
             prob *= DDT[in_diff][out_diff]
             prob /= 16
     return prob
@@ -133,7 +136,7 @@ cipher = basicSPN(key, nrounds=NR)
 print(cipher)
 SBOX = cipher.sbox_dct['sbox']
 PBOX_INV = cipher.pbox_inv
-DDT = difference_distribution_table(SBOX, truncated=True)
+DDT = difference_distribution_table(SBOX)
 B_S = branch_number(DDT)
 number_of_sbox = 4 * NR
 number_of_vars = 16 * NR
@@ -219,5 +222,5 @@ XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
  . . . .  1 1 . .  . . . .  . . . .
          | S-BOX |
-diff. prob. = 1/1048576
+diff. prob. = 1/16384
 """
