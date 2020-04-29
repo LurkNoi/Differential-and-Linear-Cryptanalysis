@@ -12,9 +12,15 @@ import os
 from fractions import Fraction
 
 import mip
-from differential_util import difference_distribution_table
+from differential_util import difference_distribution_table, print_table
 from spn import basicSPN
 
+
+def bounded_DDT(DDT, lbound):
+    bDDT = [[DDT[i][j] if DDT[i][j] >= lbound else 0
+             for j in range(len(DDT[0]))]
+            for i in range(len(DDT))]
+    return bDDT
 
 def add_xor(model, a, b, c):
     r"""
@@ -132,7 +138,7 @@ def print_path(Nr, sol_x, sol_A, **kwargs):
             else:
                 print('.', end=' ')
         print()
-        print('X'*36)
+        print(' P-BOX '.center(36, '='))
 
 def get_prob(sol_x_, sol_A_, DDT):
     """
@@ -147,7 +153,7 @@ def get_prob(sol_x_, sol_A_, DDT):
                           + 2*sol_x_[4*t+2] + sol_x_[4*t+3])
             out_diff = int(8*sol_y_[4*t] + 4*sol_y_[4*t+1]
                            + 2*sol_y_[4*t+2] + sol_y_[4*t+3])
-            # print(in_diff, out_diff, DDT[in_diff][out_diff])
+            print(in_diff, out_diff, DDT[in_diff][out_diff])
             prob *= DDT[in_diff][out_diff]
             prob /= 16
     return prob
@@ -160,12 +166,15 @@ print(cipher)
 SBOX = cipher.sbox_dct['sbox']
 PBOX_INV = cipher.pbox_inv
 DDT = difference_distribution_table(SBOX)
-B_S = branch_number(DDT)
+bDDT = bounded_DDT(DDT, 6)
+B_S = branch_number(bDDT)
 number_of_sbox = 4 * NR
 number_of_vars = 16 * NR
-max_solutions = 3
+max_solutions = 1
 solutions = []
 
+# print_table(bDDT, nonzero=True)
+# exit()
 m = mip.Model(sense=mip.MINIMIZE, solver_name=mip.CBC)
 m.verbose = 0
 m.preprocess = 1
@@ -175,7 +184,8 @@ x_ = [m.add_var(name=f'x{i}', var_type=mip.BINARY)
       for i in range(number_of_vars)]
 A_ = [m.add_var(name=f'S{t}', var_type=mip.BINARY)
       for t in range(number_of_sbox)]
-sum_At = mip.xsum(A_[t] for t in range(number_of_sbox))
+# ignore last round
+sum_At = mip.xsum(A_[t] for t in range(number_of_sbox-4))
 m.objective = sum_At
 m += sum_At >= 1
 
@@ -194,48 +204,53 @@ for r in range(NR):
         # add_sbox(model=m, xs=block_in[4*i : 4*(i+1)], A_t=A_[t],
         #          ys=block_out[4*i : 4*(i+1)], B_S=B_S)
         add_sbox(model=m, xs=block_in[4*i : 4*(i+1)], A_t=A_[t],
-                 ys=block_out[4*i : 4*(i+1)], B_S=B_S, DDT=DDT)
+                 ys=block_out[4*i : 4*(i+1)], B_S=B_S, DDT=bDDT)
 
 # m.write('spn.lp')
 sol_x_ = None
 num_sol = 0
 while num_sol < max_solutions:
-    if sol_x_ is not None:
-        # remove previous solution
-        m += mip.xsum(
-            sol_x_[i]*(1-x_[i]) + (1-sol_x_[i])*x_[i]
-            for i in range(number_of_vars)
-        ) >= 1
-    status = m.optimize(max_seconds=30)
-    if status == mip.OptimizationStatus.OPTIMAL:
-        print('optimal solution cost {} found'.format(
-            m.objective_value))
-    elif status == mip.OptimizationStatus.FEASIBLE:
-        print('sol.cost {} found, best possible: {}'.format(
-            m.objective_value, m.objective_bound))
-    elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
-        raise ValueError('no feasible solution found, '\
-                         'lower bound is: {}'.format(m.objective_bound))
+    try:
+        if sol_x_ is not None:
+            # remove previous solution
+            m += mip.xsum(
+                sol_x_[i]*(1-x_[i]) + (1-sol_x_[i])*x_[i]
+                for i in range(number_of_vars)
+            ) >= 1
+        status = m.optimize(max_seconds=30)
+        if status == mip.OptimizationStatus.OPTIMAL:
+            print('optimal solution cost {} found'.format(
+                m.objective_value))
+        elif status == mip.OptimizationStatus.FEASIBLE:
+            print('sol.cost {} found, best possible: {}'.format(
+                m.objective_value, m.objective_bound))
+        elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
+            raise ValueError('no feasible solution found, '\
+                             'lower bound is: {}'.format(m.objective_bound))
 
-    sol_x_ = [int(x_[i].x) for i in range(number_of_vars)]
-    sol_A_ = [int(A_[t].x) for t in range(number_of_sbox)]
-    sol_y_ = sol_x_[16:]
-    for r in range(NR - 1):
-        next_block_in = sol_y_[16*r : 16*(r+1)]
-        sol_y_[16*r : 16*(r+1)] = [next_block_in[PBOX_INV[i]]
-                                   for i in range(16)]
+        sol_x_ = [int(x_[i].x) for i in range(number_of_vars)]
+        sol_A_ = [int(A_[t].x) for t in range(number_of_sbox)]
+        sol_y_ = sol_x_[16:]
+        for r in range(NR - 1):
+            next_block_in = sol_y_[16*r : 16*(r+1)]
+            sol_y_[16*r : 16*(r+1)] = [next_block_in[PBOX_INV[i]]
+                                       for i in range(16)]
 
-    prob = get_prob(sol_x_, sol_A_, DDT)
-    if prob == 0:
-        continue
-    num_sol += 1
-    solutions.append({
-        'Nr': NR,
-        'sol_x': sol_x_,
-        'sol_y': sol_y_,
-        'sol_A': sol_A_,
-        'prob': prob,
-    })
+        prob = get_prob(sol_x_, sol_A_, DDT)
+        if prob == 0:
+            continue
+        num_sol += 1
+        solutions.append({
+            'Nr': NR,
+            'sol_x': sol_x_,
+            'sol_y': sol_y_,
+            'sol_A': sol_A_,
+            'prob': prob,
+        })
+
+    except Exception as e:
+        print(e)
+        break
 
 for sol in sorted(solutions, key=lambda x: x['prob'], reverse=True):
     print_path(**sol)
