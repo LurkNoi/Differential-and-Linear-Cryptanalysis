@@ -63,11 +63,13 @@ def add_sbox(model, xs, A_t, **kwargs):
     """
     ys = kwargs.get('ys', None)
     B_S = kwargs.get('B_S', None)
+    DDT = kwargs.get('DDT', None)
     input_size = len(xs)
     sum_xs = mip.xsum(xs[i] for i in range(input_size))
     model += sum_xs >= A_t
     for i in range(input_size):
         model += A_t >= xs[i]
+
     if (ys is None) or (B_S is None):
         return
     output_size = len(ys)
@@ -80,33 +82,51 @@ def add_sbox(model, xs, A_t, **kwargs):
     model += input_size * sum_ys >= sum_xs
     model += output_size * sum_xs >= sum_ys
 
+    # remove S-Box impossible case
+    if DDT is None:
+        return
+    for i in range(1 << input_size):
+        for j in range(1 << output_size):
+            if DDT[i][j] == 0:
+                xs_v = [(i>>(input_size-1-k))&1
+                        for k in range(input_size)]
+                ys_v = [(j>>(output_size-1-k))&1
+                        for k in range(output_size)]
+                model += mip.xsum(
+                    xs_v[m]*(1-xs[m]) + (1-xs_v[m])*xs[m]
+                    for m in range(input_size)
+                ) + mip.xsum(
+                    ys_v[n]*(1-ys[n]) + (1-ys_v[n])*ys[n]
+                    for n in range(output_size)
+                ) >= 1
 
-def print_path(Nr, sol_x_, sol_y_, sol_A_):
+def print_path(Nr, sol_x, sol_A, **kwargs):
     """
     print the path for basicSPN
     """
+    sol_y = kwargs.get('sol_y', None)
     for r in range(Nr):
         for i in range(16*r, 16*(r+1)):
             if i%4 == 0:
                 print(' ', end='')
-            if sol_x_[i] == 1:
+            if sol_x[i] == 1:
                 print('1', end=' ')
             else:
                 print('.', end=' ')
         print()
         for i in range(4):
             t = 4*r + i
-            if sol_A_[t] == 1:
+            if sol_A[t] == 1:
                 print('| S-BOX |', end='')
             else:
                 print(' '*9, end='')
         print()
-        if r == Nr - 1:
-            break
+        if (r == Nr - 1) or (sol_y is None):
+            continue
         for i in range(16*r, 16*(r+1)):
             if i%4 == 0:
                 print(' ', end='')
-            if sol_y_[i] == 1:
+            if sol_y[i] == 1:
                 print('1', end=' ')
             else:
                 print('.', end=' ')
@@ -142,7 +162,8 @@ DDT = difference_distribution_table(SBOX)
 B_S = branch_number(DDT)
 number_of_sbox = 4 * NR
 number_of_vars = 16 * NR
-max_solutions = 1
+max_solutions = 3
+solutions = []
 
 m = mip.Model(sense=mip.MINIMIZE, solver_name=mip.CBC)
 m.verbose = 0
@@ -169,8 +190,10 @@ for r in range(NR):
     block_out = [next_block_in[PBOX_INV[i]] for i in range(16)]
     for i in range(4):
         t = 4*r + i
+        # add_sbox(model=m, xs=block_in[4*i : 4*(i+1)], A_t=A_[t],
+        #          ys=block_out[4*i : 4*(i+1)], B_S=B_S)
         add_sbox(model=m, xs=block_in[4*i : 4*(i+1)], A_t=A_[t],
-                 ys=block_out[4*i : 4*(i+1)], B_S=B_S)
+                 ys=block_out[4*i : 4*(i+1)], B_S=B_S, DDT=DDT)
 
 # m.write('spn.lp')
 sol_x_ = None
@@ -205,24 +228,14 @@ while num_sol < max_solutions:
     if prob == 0:
         continue
     num_sol += 1
-    print_path(NR, sol_x_, sol_y_, sol_A_)
-    print('diff. prob. = {}\n'.format(prob))
+    solutions.append({
+        'Nr': NR,
+        'sol_x': sol_x_,
+        'sol_y': sol_y_,
+        'sol_A': sol_A_,
+        'prob': prob,
+    })
 
-"""result-1 -- not feasible
-optimal solution cost 6.0 found
- . . . .  1 1 1 1  . . . .  . . . .
-         | S-BOX |
- . . . .  1 . . 1  . . . .  . . . .
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
- . 1 . .  . . . .  . . . .  . 1 . .
-| S-BOX |                  | S-BOX |
- 1 1 . .  . . . .  . . . .  1 1 . .
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
- 1 . . 1  1 . . 1  . . . .  . . . .
-| S-BOX || S-BOX |
- . 1 . .  . 1 . .  . . . .  . . . .
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
- . . . .  1 1 . .  . . . .  . . . .
-         | S-BOX |
-diff. prob. = 1/16384
-"""
+for sol in sorted(solutions, key=lambda x: x['prob'], reverse=True):
+    print_path(**sol)
+    print('diff. prob. = {}\n'.format(sol['prob']))
