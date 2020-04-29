@@ -50,7 +50,7 @@ def branch_number(DDT):
                     min_weight = wt
     return min_weight
 
-def add_sbox(model, xs, A_t, ys=None, B_S=None):
+def add_sbox(model, xs, A_t, **kwargs):
     """
     add constraints for sbox
 
@@ -61,6 +61,8 @@ def add_sbox(model, xs, A_t, ys=None, B_S=None):
     - ``xs`` - list of S-Box input bits, None for last round
     - ``ys`` - list of S-Box output bits, None for last round
     """
+    ys = kwargs.get('ys', None)
+    B_S = kwargs.get('B_S', None)
     input_size = len(xs)
     sum_xs = mip.xsum(xs[i] for i in range(input_size))
     model += sum_xs >= A_t
