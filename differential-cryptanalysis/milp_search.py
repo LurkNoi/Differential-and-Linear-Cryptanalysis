@@ -60,6 +60,7 @@ def add_sbox(model, xs, A_t, **kwargs):
     - ``B_s`` - branch number of S-Box
     - ``xs`` - list of S-Box input bits, None for last round
     - ``ys`` - list of S-Box output bits, None for last round
+    - ``DDT`` - difference distribution table of S-Box
     """
     ys = kwargs.get('ys', None)
     B_S = kwargs.get('B_S', None)
