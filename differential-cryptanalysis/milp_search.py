@@ -79,6 +79,53 @@ def add_sbox(model, xs, A_t, ys=None, B_S=None):
     model += output_size * sum_xs >= sum_ys
 
 
+def print_path(Nr, sol_x_, sol_y_, sol_A_):
+    """
+    print the path for basicSPN
+    """
+    for r in range(Nr):
+        for i in range(16*r, 16*(r+1)):
+            if i%4 == 0:
+                print(' ', end='')
+            if sol_x_[i] == 1:
+                print('1', end=' ')
+            else:
+                print('.', end=' ')
+        print()
+        for i in range(4):
+            t = 4*r + i
+            if sol_A_[t] == 1:
+                print('| S-BOX |', end='')
+            else:
+                print(' '*9, end='')
+        print()
+        if r == Nr - 1:
+            break
+        for i in range(16*r, 16*(r+1)):
+            if i%4 == 0:
+                print(' ', end='')
+            if sol_y_[i] == 1:
+                print('1', end=' ')
+            else:
+                print('.', end=' ')
+        print()
+        print('X'*36)
+
+def get_prob(sol_x_, sol_A_, DDT):
+    """
+    caculate the prob.
+    """
+    prob = Fraction(1, 1)
+    for t in range(len(sol_A_) - 4):
+        if sol_A_[t] == 1:
+            in_diff = int(8*sol_x_[4*t] + 4*sol_x_[4*t+1]
+                          + 2*sol_x_[4*t+2] + sol_x_[4*t+3])
+            out_diff = int(8*sol_y_[4*t] + 4*sol_y_[4*t+1]
+                           + 2*sol_y_[4*t+2] + sol_y_[4*t+3])
+            prob *= DDT[in_diff][out_diff]
+            prob /= 16
+    return prob
+
 # Calculating the Minimum Number of Active S-boxes
 NR = 4
 key = os.urandom(2*NR + 2)
@@ -90,8 +137,13 @@ DDT = difference_distribution_table(SBOX, truncated=True)
 B_S = branch_number(DDT)
 number_of_sbox = 4 * NR
 number_of_vars = 16 * NR
+max_solutions = 1
 
 m = mip.Model(sense=mip.MINIMIZE, solver_name=mip.CBC)
+m.verbose = 0
+m.preprocess = 1
+m.threads = 4
+
 x_ = [m.add_var(name=f'x{i}', var_type=mip.BINARY)
       for i in range(number_of_vars)]
 A_ = [m.add_var(name=f'S{t}', var_type=mip.BINARY)
@@ -101,7 +153,7 @@ m.objective = sum_At
 m += sum_At >= 1
 
 # add constraints
-for r in range(NR - 1):
+for r in range(NR):
     block_in = x_[16*r : 16*(r+1)]
     if r == NR - 1:
         for i in range(4):
@@ -116,64 +168,56 @@ for r in range(NR - 1):
                  ys=block_out[4*i : 4*(i+1)], B_S=B_S)
 
 # m.write('spn.lp')
+sol_x_ = None
+num_sol = 0
+while num_sol < max_solutions:
+    if sol_x_ is not None:
+        # remove previous solution
+        m += mip.xsum(
+            sol_x_[i]*(1-x_[i]) + (1-sol_x_[i])*x_[i]
+            for i in range(number_of_vars)
+        ) >= 1
+    status = m.optimize(max_seconds=30)
+    if status == mip.OptimizationStatus.OPTIMAL:
+        print('optimal solution cost {} found'.format(
+            m.objective_value))
+    elif status == mip.OptimizationStatus.FEASIBLE:
+        print('sol.cost {} found, best possible: {}'.format(
+            m.objective_value, m.objective_bound))
+    elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
+        raise ValueError('no feasible solution found, '\
+                         'lower bound is: {}'.format(m.objective_bound))
 
-m.verbose = 0
-status = m.optimize(max_seconds=30)
-if status == mip.OptimizationStatus.OPTIMAL:
-    print('optimal solution cost {} found'.format(
-        m.objective_value))
-elif status == mip.OptimizationStatus.FEASIBLE:
-    print('sol.cost {} found, best possible: {}'.format(
-        m.objective_value, m.objective_bound))
-elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
-    raise ValueError('no feasible solution found, '\
-                     'lower bound is: {}'.format(m.objective_bound))
+    sol_x_ = [int(x_[i].x) for i in range(number_of_vars)]
+    sol_A_ = [int(A_[t].x) for t in range(number_of_sbox)]
+    sol_y_ = sol_x_[16:]
+    for r in range(NR - 1):
+        next_block_in = sol_y_[16*r : 16*(r+1)]
+        sol_y_[16*r : 16*(r+1)] = [next_block_in[PBOX_INV[i]]
+                                   for i in range(16)]
 
-sol_x_ = [x_[i].x for i in range(number_of_vars)]
-sol_A_ = [A_[t].x for t in range(number_of_sbox)]
-sol_y_ = sol_x_[16:]
-for r in range(NR - 1):
-    next_block_in = sol_y_[16*r : 16*(r+1)]
-    sol_y_[16*r : 16*(r+1)] = [next_block_in[PBOX_INV[i]]
-                               for i in range(16)]
+    prob = get_prob(sol_x_, sol_A_, DDT)
+    if prob == 0:
+        continue
+    num_sol += 1
+    print_path(NR, sol_x_, sol_y_, sol_A_)
+    print('diff. prob. = {}\n'.format(prob))
 
-# print the path
-for r in range(NR):
-    for i in range(16*r, 16*(r+1)):
-        if i%4 == 0:
-            print(' ', end='')
-        if sol_x_[i] == 1:
-            print('1', end=' ')
-        else:
-            print('.', end=' ')
-    print()
-    for i in range(4):
-        t = 4*r + i
-        if sol_A_[t] == 1:
-            print('| S-BOX |', end='')
-        else:
-            print(' '*9, end='')
-    print()
-    if r == NR - 1:
-        break
-    for i in range(16*r, 16*(r+1)):
-        if i%4 == 0:
-            print(' ', end='')
-        if sol_y_[i] == 1:
-            print('1', end=' ')
-        else:
-            print('.', end=' ')
-    print()
-    print('X'*36)
-
-# caculate the prob.
-prob = Fraction(1, 1)
-for t in range(number_of_sbox - 4):
-    if sol_A_[t] == 1:
-        in_diff = int(8*sol_x_[4*t] + 4*sol_x_[4*t+1]
-                      + 2*sol_x_[4*t+2] + sol_x_[4*t+3])
-        out_diff = int(8*sol_y_[4*t] + 4*sol_y_[4*t+1]
-                       + 2*sol_y_[4*t+2] + sol_y_[4*t+3])
-        prob *= DDT[in_diff][out_diff]
-        prob /= 16
-print('diff. prob. = {}'.format(prob))
+"""result-1 -- not feasible
+optimal solution cost 6.0 found
+ . . . .  1 1 1 1  . . . .  . . . .
+         | S-BOX |
+ . . . .  1 . . 1  . . . .  . . . .
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+ . 1 . .  . . . .  . . . .  . 1 . .
+| S-BOX |                  | S-BOX |
+ 1 1 . .  . . . .  . . . .  1 1 . .
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+ 1 . . 1  1 . . 1  . . . .  . . . .
+| S-BOX || S-BOX |
+ . 1 . .  . 1 . .  . . . .  . . . .
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+ . . . .  1 1 . .  . . . .  . . . .
+         | S-BOX |
+diff. prob. = 1/1048576
+"""
