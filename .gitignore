@@ -183,3 +183,7 @@ dkms.conf
 
 # VS Code
 .vscode/
+
+# MILP
+.lp
+.sol
