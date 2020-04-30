@@ -1,5 +1,16 @@
 # Differential-and-Linear-Cryptanalysis
 
+## Issues
+
+- [ ] Still need to manually simplify POS (with Logic Friday) when using MILP to model S-Box
+
+- [ ] Equations is too long for large (8-bit) S-Box (Logic Friday buffer size only 64k char.)
+
+## TODO
+
+- [ ] simplify logical condition with python
+
+- [ ] modeling Feistel Network
 
 
 ## Reference
