@@ -186,7 +186,7 @@ class MilpOptim:
             for i in range(4):
                 t = 4*r + i
                 self.add_sbox(xs=block_in[4*i : 4*(i+1)], A_t=A_[t],
-                         ys=block_out[4*i : 4*(i+1)],)
+                              ys=block_out[4*i : 4*(i+1)])
 
         while num_sol < max_solutions:
             try:
@@ -200,10 +200,10 @@ class MilpOptim:
                 status = m.optimize(max_seconds=max_seconds)
                 if status == mip.OptimizationStatus.OPTIMAL:
                     print('optimal solution cost {} found'.format(
-                          m.objective_value))
+                        m.objective_value))
                 elif status == mip.OptimizationStatus.FEASIBLE:
                     print('sol.cost {} found, best possible: {}'.format(
-                          m.objective_value, m.objective_bound))
+                        m.objective_value, m.objective_bound))
                 elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
                     raise ValueError('no feasible solution found, '\
                                      'lower bound is: {}'.format(m.objective_bound))

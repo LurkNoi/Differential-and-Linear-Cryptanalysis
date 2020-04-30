@@ -21,11 +21,17 @@ from spn import basicSPN
 
 
 def lcm(lst):
+    """
+    return lcm of a given list
+    """
     if len(lst) == 1:
         return lst[0]
-    return reduce(lambda x,y: x*y//gcd(x,y), lst)
+    return reduce(lambda x, y: x*y//gcd(x, y), lst)
 
 def separate_ddt(diff_dist_table):
+    """
+    separate DDT by diffreence
+    """
     nrows = len(diff_dist_table)
     ncols = len(diff_dist_table[0])
     max_count = diff_dist_table[0][0]
@@ -36,10 +42,9 @@ def separate_ddt(diff_dist_table):
     result = []
     for bias in biases:
         truncated_table = [
-            [1 if diff_dist_table[i][j]==bias else 0 for j in range(ncols)]
+            [1 if diff_dist_table[i][j] == bias else 0 for j in range(ncols)]
             for i in range(nrows)
         ]
-        # truncated_table[0][0] = 1
         result.append({
             'b': bias,
             'probility': Fraction(bias, max_count),
@@ -51,6 +56,9 @@ def separate_ddt(diff_dist_table):
     return result
 
 def to_product_of_sum(dct):
+    """
+    convert DDT zero entries to POS format
+    """
     b = dct['b']
     sz_i = dct['input_size']
     sz_o = dct['output_size']
@@ -74,6 +82,9 @@ def to_product_of_sum(dct):
     return POS + ';'
 
 def from_product_of_sum(minimized_pos):
+    """
+    build constraints for a given (minimized) POS
+    """
     constraints = []
     for constr in re.findall(r'\([^\)]+\)', minimized_pos):
         pattern = {}
@@ -88,7 +99,7 @@ def from_product_of_sum(minimized_pos):
 
 class MilpOptim:
     """
-    MILP Optimizer for S-boxes
+    MILP Optimizer for finding the best differential characteristic of SPN cipher
     """
     def __init__(self, Nr, DDTs, pbox_inv, **kwargs):
         self.Nr = Nr
@@ -98,8 +109,8 @@ class MilpOptim:
         model.verbose = kwargs.get('verbose', 0)
         model.preprocess = kwargs.get('preprocess', 1)
         model.threads = kwargs.get('threads', 4)
-        input_size = (len(DDTs[0]['table']) - 1).bit_length()
-        output_size = (len(DDTs[0]['table'][0]) - 1).bit_length()
+        input_size = DDTs[0]['input_size']
+        output_size = DDTs[0]['output_size']
         # M is a sufficiently big integer to build the conditional constraint
         self.M = kwargs.get('M', input_size+output_size+1)
         block_size = len(pbox_inv)
@@ -124,16 +135,14 @@ class MilpOptim:
         self.model = model
         self.x = x_
         self.Q = Q_
-        self.input_size = input_size
-        self.output_size = output_size
         self.block_size = block_size
         self.nsbox = nsbox
 
     def add_constr(self, ddt_dct, X, Y, t):
-        sz_i = self.input_size
-        sz_o = self.output_size
         M = self.M
         m = self.model
+        sz_i = ddt_dct['input_size']
+        sz_o = ddt_dct['output_size']
         for pattern in ddt_dct['CONSTR']:
             m += mip.xsum(
                 X[i]*(1-pattern.get(f"X{sz_i-1-i}", 1))
@@ -151,8 +160,8 @@ class MilpOptim:
         Q_ = self.Q
         sum_xs = mip.xsum(xs)
         m += sum_xs >= Q_[t]
-        for i in range(len(xs)):
-            m += Q_[t] >= xs[i]
+        for xs_i in xs:
+            m += Q_[t] >= xs_i
         if ys is None:
             return
         sum_ys = mip.xsum(ys)
@@ -184,6 +193,7 @@ class MilpOptim:
     def solve(self, **kwargs):
         max_seconds = kwargs.get('max_seconds', 30)
         max_solutions = kwargs.get('max_solutions', 1)
+        write_file = kwargs.get('write_file', None)
         sol_x_ = None
         num_sol = 0
         PBOX_INV = self.pbox_inv
@@ -191,8 +201,8 @@ class MilpOptim:
         Nr = self.Nr
         x_ = self.x
         bs = self.block_size
-        sz = self.input_size
         nsbox = self.nsbox
+        sz = bs // nsbox
         self.solutions = []
         for r in range(Nr):
             block_in = x_[bs*r : bs*(r+1)]
@@ -209,21 +219,22 @@ class MilpOptim:
                               ys=block_out[sz*i : sz*(i+1)])
 
         while num_sol < max_solutions:
+            if sol_x_ is not None:
+                # remove previous solution
+                m += mip.xsum(
+                    sol_x_[i]*(1-x_[i]) + (1-sol_x_[i])*x_[i]
+                    for i in range(bs*Nr)
+                ) >= 1
+            if write_file is not None:
+                m.write(write_file + '.lp')
             try:
-                if sol_x_ is not None:
-                    # remove previous solution
-                    m += mip.xsum(
-                        sol_x_[i]*(1-x_[i]) + (1-sol_x_[i])*x_[i]
-                        for i in range(bs*Nr)
-                    ) >= 1
-                m.write('spn.lp')
                 status = m.optimize(max_seconds=max_seconds)
                 if status == mip.OptimizationStatus.OPTIMAL:
                     print('optimal solution cost {} found'.format(
-                          m.objective_value))
+                        m.objective_value))
                 elif status == mip.OptimizationStatus.FEASIBLE:
                     print('sol.cost {} found, best possible: {}'.format(
-                          m.objective_value, m.objective_bound))
+                        m.objective_value, m.objective_bound))
                 elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
                     raise ValueError('no feasible solution found, '\
                                      'lower bound is: {}'.format(m.objective_bound))
@@ -235,10 +246,12 @@ class MilpOptim:
 
             prob = self.get_prob()
             if prob == 0:
-                continue
+                raise ValueError("probility shouldn't be zero")
             num_sol += 1
             self.print_path()
-            print('diff. prob. = {}\n'.format(prob))
+            print('diff. prob. = {}'.format(prob))
+            # N_D \approx c/p_D
+            print('number of paris N_D = {}c'.format(int(1/prob)))
 
 
 
@@ -278,9 +291,10 @@ if __name__ == '__main__':
     best differential characteristic for basicSPN (4 round)
 
     optimal solution cost 14.0 found
-    1 . 1 1 . . . . 1 . 1 1 . . . . 
-    . . . . . . . . 1 . 1 . . . . . 
-    . . 1 . . . . . . . . . . . . . 
-    . . . . 1 . . . . . . . 1 . . . 
+    1 . 1 1 . . . . 1 . 1 1 . . . .
+    . . . . . . . . 1 . 1 . . . . .
+    . . 1 . . . . . . . . . . . . .
+    . . . . 1 . . . . . . . 1 . . .
     diff. prob. = 9/256
+    number of paris N_D = 28c
     """
