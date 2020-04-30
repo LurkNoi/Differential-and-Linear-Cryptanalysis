@@ -185,5 +185,8 @@ dkms.conf
 .vscode/
 
 # MILP
-.lp
-.sol
+*.lp
+*.sol
+
+# EDA
+*.pla
