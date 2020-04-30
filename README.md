@@ -2,13 +2,14 @@
 
 ## Issues
 
-- [ ] Still need to manually simplify POS (with Logic Friday) when using MILP to model S-Box
+- [x] Still need to manually simplify POS when using MILP to model S-Box
+    - possible solution: solve with pyeda.boolalg.espresso
 
-- [ ] Equations is too long for large (8-bit) S-Box (Logic Friday buffer size only 64k char.)
+- [ ] Equations is too long for large (8-bit) S-Box
 
 ## TODO
 
-- [ ] simplify logical condition with python
+- [x] simplify logical condition with python
 
 - [ ] modeling Feistel Network
 
@@ -20,3 +21,5 @@
 - Sun S. et al. Automatic Security Evaluation of Block Ciphers with S-bP Structures Against Related-Key Differential Attacks. DOI: https://doi.org/10.1007/978-3-319-12087-4_3
 
 - Abdelkhalek, A. et al. MILP Modeling for (Large) S-boxes to Optimize Probability of Differential Characteristics. DOI: https://doi.org/10.13154/tosc.v2017.i4.99-129
+
+- Baignères T. et al. How Far Can We Go Beyond Linear Cryptanalysis?. DOI: https://doi.org/10.1007/978-3-540-30539-2_31
