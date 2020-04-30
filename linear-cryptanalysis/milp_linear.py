@@ -10,7 +10,7 @@ from itertools import chain
 from functools import reduce
 
 import mip
-from linear_utils import linear_approximation_table, print_table
+from linear_util import linear_approximation_table, print_table
 from spn import basicSPN
 
 
@@ -74,6 +74,32 @@ def to_product_of_sum(dct):
                         constraint += "'"
                 POS += '(' + constraint[1:] + ')'
     return POS + ';'
+
+def to_sum_of_product(dct):
+    """
+    convert LAT nonzero entries to SOP format
+    """
+    b = dct['b']
+    sz_i = dct['input_size']
+    sz_o = dct['output_size']
+    table = dct['table']
+    POS = "F{} = ".format(b)
+    for x in range(1 << sz_i):
+        for y in range(1 << sz_o):
+            if table[x][y] != 0:
+                # from lsb to msb
+                X = [(x>>k)&1 for k in range(sz_i)]
+                Y = [(y>>k)&1 for k in range(sz_o)]
+                constraint = ""
+                for k in reversed(range(sz_i)):
+                    constraint += "X{}".format(k)
+                    if X[k] == 0:
+                        constraint += "'"
+                    constraint += "Y{}".format(k)
+                    if Y[k] == 0:
+                        constraint += "'"
+                POS += constraint + '+'
+    return POS[:-1] + ';'
 
 def from_product_of_sum(minimized_pos):
     """
