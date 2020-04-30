@@ -6,7 +6,7 @@ import subprocess
 
 import mip
 
-__all__ = ['to_pla', 'from_pla', 'simplify', 'MilpOptim']
+__all__ = ['mip', 'to_pla', 'from_pla', 'simplify', 'parse_constr', 'MilpOptim']
 
 
 def to_pla(table, output_file=None):
@@ -47,6 +47,23 @@ def simplify(file_i, file_o):
     command = "espresso {} > {}".format(file_i, file_o)
     subprocess.run(command, shell=True, check=True)
 
+def parse_constr(minimized_cons):
+    """
+    build constraints for a given (minimized) POS
+    """
+    sbox_size = len(minimized_cons[0])//2
+    constraints = []
+    for con in minimized_cons:
+        pattern = {}
+        for i, ch in enumerate(con[:sbox_size]):
+            if ch != '-':
+                pattern['X{}'.format(sbox_size-i)] = int(ch)
+        for j, ch in enumerate(con[-sbox_size:]):
+            if ch != '-':
+                pattern['Y{}'.format(sbox_size-j)] = int(ch)
+        constraints.append(pattern.copy())
+    return constraints
+
 
 class MilpOptim:
     """
@@ -76,6 +93,8 @@ class MilpOptim:
         elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
             raise ValueError('no feasible solution found, '\
                              'lower bound is: {}'.format(model.objective_bound))
+        else:
+            raise ValueError("not considered status code")
 
 
 if __name__ == '__main__':
