@@ -2,11 +2,12 @@
 """
 base class and some other utils for MILP Optimizer
 """
+import sys
 import subprocess
 
-import mip
+from mip import Model, BINARY, xsum, OptimizationStatus
 
-__all__ = ['mip', 'to_pla', 'from_pla', 'simplify', 'parse_constr', 'MilpOptim']
+__all__ = ['to_pla', 'from_pla', 'simplify', 'parse_constr', 'MilpOptim']
 
 
 def to_pla(table, output_file=None):
@@ -28,7 +29,7 @@ def to_pla(table, output_file=None):
         data += "{0:0{1}b} {2}\n".format(idx, size, 1 if table[idx] == 0 else 0)
     data += ".e\n"
     if output_file is None:
-        print(data)
+        sys.stdout.write(data)
         return
     open(output_file, 'w', buffering=1).write(data)
 
@@ -47,76 +48,119 @@ def simplify(file_i, file_o):
     command = "espresso {} > {}".format(file_i, file_o)
     subprocess.run(command, shell=True, check=True)
 
-def parse_constr(minimized_cons):
+def parse_constr(minimized_cons, sbox_size=None):
     """
     build constraints for a given (minimized) POS
+
+    INPUT:
+
+    - ``minimized_cons`` - list of constraints string
+    - ``sbox_size`` - tuple (sbox input size, sbox output size)
     """
+    if sbox_size is None:
+        sz_i = sz_o = len(minimized_cons[0])//2
+    else:
+        sz_i, sz_o = sbox_size
     sbox_size = len(minimized_cons[0])//2
     constraints = []
     for con in minimized_cons:
         pattern = {}
-        for i, ch in enumerate(con[:sbox_size]):
+        for i, ch in enumerate(con[:sz_i]):
             if ch != '-':
-                pattern['X{}'.format(sbox_size-i)] = int(ch)
-        for j, ch in enumerate(con[-sbox_size:]):
+                pattern['X{}'.format(i)] = int(ch)
+        for j, ch in enumerate(con[-sz_o:]):
             if ch != '-':
-                pattern['Y{}'.format(sbox_size-j)] = int(ch)
+                pattern['Y{}'.format(j)] = int(ch)
         constraints.append(pattern.copy())
     return constraints
 
 
-class MilpOptim:
+class MilpOptim(Model):
     """
-    base class of MILP Optimizer
+    MILP Optimizer for S-Box based cipher
     """
-
-    def __init__(self, **kwargs):
-        model = mip.Model(sense=mip.MINIMIZE, solver_name=mip.CBC)
-        model.verbose = kwargs.get('verbose', 0)
-        model.preprocess = kwargs.get('preprocess', 1)
-        model.threads = kwargs.get('threads', 4)
-        self.model = model
 
     def __repr__(self):
         return "MIP ({}) model with {} constraints".format(
-            self.model.solver_name, self.model.num_rows)
+            self.solver_name, self.num_rows)
 
-    def optimize(self, max_seconds):
-        model = self.model
-        status = model.optimize(max_seconds=max_seconds)
-        if status == mip.OptimizationStatus.OPTIMAL:
-            print('optimal solution cost {} found'.format(
-                model.objective_value))
-        elif status == mip.OptimizationStatus.FEASIBLE:
-            print('sol.cost {} found, best possible: {}'.format(
-                model.objective_value, model.objective_bound))
-        elif status == mip.OptimizationStatus.NO_SOLUTION_FOUND:
+    def new_var(self, name, nbits):
+        """
+        generate bit-vecter, represented by array of BINARY
+        """
+        var = [self.add_var(name=f'{name}_{i}', var_type=BINARY)
+               for i in range(nbits)]
+        return var
+
+    def add_xor(self, A, B, C):
+        r"""
+        add xor constraint for expr ``A \xor B = C``
+        """
+        if not isinstance(A, list):
+            A, B, C = [A], [B], [C]
+        for a, b, c in zip(A, B, C):
+            self += a + b + (1-c) >= 1
+            self += a + (1-b) + c >= 1
+            self += (1-a) + b + c >= 1
+            self += (1-a) + (1-b) + (1-c) >= 1
+
+    def add_impos(self, pattern, X, Y):
+        """
+        remove impossible case for a given pattern
+        """
+        sz_i = len(X)
+        sz_o = len(Y)
+        self += xsum(
+            X[i] * (1-pattern.get(f"X{i}", 1))
+            + (1-X[i]) * pattern.get(f"X{i}", 0)
+            for i in range(sz_i)
+        ) + xsum(
+            Y[j] * (1-pattern.get(f"Y{j}", 1))
+            + (1-Y[j]) * pattern.get(f"Y{j}", 0)
+            for j in range(sz_o)
+        ) >= 1
+
+    def check(self, **kwds):
+        """
+        optimize the model and output the status,
+        raise ValueError when no solution found
+        """
+        status = self.optimize(**kwds)
+        if status == OptimizationStatus.OPTIMAL:
+            sys.stdout.write('optimal solution cost {} found\n'.format(
+                self.objective_value))
+        elif status == OptimizationStatus.FEASIBLE:
+            sys.stdout.write('sol.cost {} found, best possible: {:.4f}\n'.format(
+                self.objective_value, self.objective_bound))
+        elif status == OptimizationStatus.NO_SOLUTION_FOUND:
             raise ValueError('no feasible solution found, '\
-                             'lower bound is: {}'.format(model.objective_bound))
+                             'lower bound is: {}'.format(self.objective_bound))
         else:
             raise ValueError("not considered status code")
 
-
-if __name__ == '__main__':
-    LAT = [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 2, 2, 0, 0, 2, 6, 2, 2, 0, 0, 2, 2, 0, 0],
-        [0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 6, 2],
-        [0, 0, 0, 0, 0, 0, 0, 0, 2, 6, 2, 2, 2, 2, 2, 2],
-        [0, 2, 0, 2, 2, 4, 2, 0, 0, 2, 0, 2, 2, 4, 2, 0],
-        [0, 2, 2, 0, 2, 0, 4, 2, 2, 0, 4, 2, 0, 2, 2, 0],
-        [0, 2, 2, 4, 2, 0, 0, 2, 0, 2, 2, 4, 2, 0, 0, 2],
-        [0, 2, 0, 2, 2, 4, 2, 0, 2, 0, 2, 0, 4, 2, 0, 2],
-        [0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 6],
-        [0, 0, 2, 2, 0, 0, 2, 2, 4, 0, 2, 2, 0, 4, 2, 2],
-        [0, 4, 2, 2, 4, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0],
-        [0, 4, 0, 4, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 2, 4, 2, 2, 0, 2, 0, 2, 0, 2, 4, 0, 2, 0, 2],
-        [0, 2, 2, 0, 2, 4, 0, 2, 4, 2, 2, 0, 2, 0, 0, 2],
-        [0, 2, 2, 0, 2, 4, 0, 2, 2, 0, 0, 2, 4, 2, 2, 0],
-        [0, 2, 4, 2, 2, 0, 2, 0, 0, 2, 4, 2, 2, 0, 2, 0],
-    ]
-    to_pla(LAT, 'lat.pla')
-    simplify('lat.pla', 'lat_sp.pla')
-    DATA_SP = from_pla('lat_sp.pla')
-    print(DATA_SP)
+    def solve(self, num_solutions=1, max_seconds=300, target_vars=None, write_file=None):
+        """
+        enumerate multiple optimal solutions
+        """
+        if target_vars is None:
+            target_vars = self.vars
+        if write_file is not None:
+            self.write(write_file)
+        solutions = []
+        count = 0
+        while count < num_solutions:
+            if target_vars[0].x is not None:
+                # remove previous solution
+                self += xsum(
+                    int(v.x)*(1-v) + int(1-v.x)*v
+                    for v in target_vars
+                ) >= 1
+            try:
+                self.check(max_seconds=max_seconds)
+            except ValueError as e:
+                sys.stderr.write(str(e)+'\n')
+                break
+            count += 1
+            solution = dict((v.name, v.x) for v in target_vars)
+            solutions.append(solution)
+        return solutions
