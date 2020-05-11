@@ -164,3 +164,47 @@ class MilpOptim(Model):
             solution = dict((v.name, v.x) for v in target_vars)
             solutions.append(solution)
         return solutions
+
+
+if __name__ == '__main__':
+    import mip
+
+    table = [
+        [0, 1, 0, 0],
+        [0, 0, 1, 0],
+        [1, 0, 0, 0],
+        [0, 0, 0, 1],
+    ]
+
+    to_pla(table, '/tmp/1.pla')
+    simplify('/tmp/1.pla', '/tmp/2.pla')
+    DATA_SP = from_pla('/tmp/2.pla')
+    print(DATA_SP)
+    CONSTR = parse_constr(DATA_SP)
+
+    SLVR = MilpOptim(sense=mip.MINIMIZE, solver_name=mip.CBC)
+    SLVR.verbose = 0
+    SLVR.preprocess = 1
+    SLVR.threads = 4
+
+    x = SLVR.new_var(name='x', nbits=2)
+    y = SLVR.new_var(name='y', nbits=2)
+    sum_x = mip.xsum(x)
+    sum_y = mip.xsum(y)
+
+    SLVR.objective = sum_x
+
+    SLVR += sum_y == 1 # select from column 1(0b01) and 2(0b10)
+    for pattern in CONSTR:
+        SLVR.add_impos(pattern, x, y)
+
+    sols = SLVR.solve(num_solutions=4, write_file='tst.lp')
+
+    for sol in sols:
+        print(sol)
+
+    # solution:
+    # {'x_0': 0.0, 'x_1': 0.0, 'y_0': 0.0, 'y_1': 1.0}
+    #   ==> table[0b00][0b01] != 0
+    # {'x_0': 0.0, 'x_1': 1.0, 'y_0': 1.0, 'y_1': 0.0}
+    #   ==> table[0b01][0b10] != 0
