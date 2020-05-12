@@ -5,7 +5,8 @@
 - [x] Still need to manually simplify POS when using MILP to model S-Box
     - possible solution: solve with pyeda.boolalg.espresso
 
-- [ ] Equations is too long for large (8-bit) S-Box
+- [x] Equations is too long for large (8-bit) S-Box
+    - possible solution: ignore small bias
 
 ## TODO
 
