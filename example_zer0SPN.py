@@ -55,11 +55,11 @@ def get_prob(Nr, sol, LAT, ptable_inv):
                 raise ValueError("prob. shouldn't be zero")
             if int(sol[f"Q{r}_{t}"]) == 1:
                 in_bits = [int(sol[f"U{r}_{k}"]) for k in range(sz*t, sz*(t+1))]
-                in_diff = sum(in_bits[k] << (sz-1-k) for k in range(sz))
+                in_mask = sum(in_bits[k] << (sz-1-k) for k in range(sz))
                 out_bits = [int(sol[f"U{r+1}_{ptable_inv[k]}"]) for k in range(sz*t, sz*(t+1))]
-                out_diff = sum(out_bits[k] << (sz-1-k) for k in range(sz))
-                # print(r, t, in_diff, out_diff, LAT[in_diff][out_diff])
-                prob *= LAT[in_diff][out_diff]
+                out_mask = sum(out_bits[k] << (sz-1-k) for k in range(sz))
+                # print(r, t, in_mask, out_mask, LAT[in_mask][out_mask])
+                prob *= LAT[in_mask][out_mask]
                 prob /= 1 << sz
                 prob *= 2
     return prob/2
