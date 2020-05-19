@@ -10,31 +10,6 @@ import mip
 from milp_util import *
 
 
-def linear_approximation_table(sbox, absolute=False, lbound=0):
-    """
-    Return the linear approximation table for a given sbox
-    """
-    nrows = len(sbox)
-    ncols = 1 << (max(sbox).bit_length())
-    if nrows & (nrows - 1) != 0:
-        raise TypeError("sbox length is not a power of 2")
-
-    absolute_bias_table = [[0 for j in range(ncols)] for i in range(nrows)]
-    for input_mask, output_mask in product(range(nrows), range(ncols)):
-        total = 0
-        for idx in range(nrows):
-            input_masked = idx & input_mask
-            output_masked = sbox[idx] & output_mask
-            if (bin(input_masked).count("1") + bin(output_masked).count("1"))&1 == 0:
-                total += 1
-        count = total - (nrows//2)
-        if absolute:
-            count = abs(count)
-        absolute_bias_table[input_mask][output_mask] = count if count >= lbound else 0
-
-    return absolute_bias_table
-
-
 def add_sbox(model, Q_t, xs):
     # non-zero input `xs` active the corresponding sbox
     model += mip.xsum(xs) >= Q_t
@@ -51,8 +26,8 @@ def get_prob(Nr, sol, LAT, ptable_inv):
     prob = Fraction(1, 1)
     for r in range(Nr-1):
         for t in range(nsbox):
-            if prob == 0:
-                raise ValueError("prob. shouldn't be zero")
+            # if prob == 0:
+            #     raise ValueError("prob. shouldn't be zero")
             if int(sol[f"Q{r}_{t}"]) == 1:
                 in_bits = [int(sol[f"U{r}_{k}"]) for k in range(sz*t, sz*(t+1))]
                 in_mask = sum(in_bits[k] << (sz-1-k) for k in range(sz))
